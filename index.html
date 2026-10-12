@@ -87,6 +87,15 @@ details summary{cursor:pointer;color:var(--mu);font-size:13px;margin-top:12px}
 .nav div{grid-template-columns:repeat(5,1fr)}
 .nav button{font-size:11.5px;padding-left:2px;padding-right:2px}
 svg.ch{width:100%;max-width:560px;height:auto;display:block;margin:6px auto 0}
+.chw{position:relative;max-width:560px;margin:6px auto 0}
+.chw svg.ch{margin:0;touch-action:pan-y;cursor:crosshair;-webkit-user-select:none;user-select:none}
+.gl{stroke:var(--mu);stroke-width:1;stroke-dasharray:3 3}
+.gd{fill:var(--bg);stroke:var(--tx);stroke-width:2}
+.tip{position:absolute;top:2px;left:0;pointer-events:none;background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:7px 11px;font-size:12.5px;line-height:1.35;min-width:140px;max-width:230px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:3}
+.tip[hidden]{display:none}
+.tip b{display:block;font-size:16px}
+.tip .d{color:var(--mu);display:block}.tip .d::first-letter{text-transform:uppercase}
+.tip .ev{color:var(--mu);font-size:12px;margin-top:2px}
 .ln{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .ln.pos{stroke:var(--ac)}.ln.neg{stroke:var(--rd)}
 .ar.pos{fill:var(--ac);opacity:.13}.ar.neg{fill:var(--rd);opacity:.2}
@@ -510,8 +519,28 @@ function lineChart(P){
   const mi=P.days.findIndex(d=>d.date===P.min.date),mx=x(mi),my=y(P.min.bal),bad=P.min.bal<0;
   const anc=mx>W*0.65?'end':mx<W*0.35?'start':'middle',ly=my-9<T?my+16:my-9;
   s+='<circle class="mk '+(bad?'rd':'')+'" cx="'+f(mx)+'" cy="'+f(my)+'" r="4"/><text class="tk '+(bad?'rd':'am')+'" text-anchor="'+anc+'" x="'+f(mx)+'" y="'+f(ly)+'">'+esc(short(P.min.bal)+' · '+fdate(P.min.date))+'</text>';
-  return s+'</svg>';
+  s+='<line id="cgl" class="gl" x1="0" x2="0" y1="'+T+'" y2="'+(H-B)+'" visibility="hidden"/><circle id="cgd" class="gd" r="4.5" cx="0" cy="0" visibility="hidden"/>';
+  const byDate={};P.evs.forEach(e=>{(byDate[e.date]=byDate[e.date]||[]).push((e.k==='in'?'+ ':'− ')+e.name+' '+fmt(e.a).replace('-',''))});
+  chartData={n,W,L,R,x,y,days:P.days,ev:byDate};
+  return '<div class="chw">'+s+'</svg><div class="tip" hidden></div></div>';
 }
+let chartData=null;
+function chartShow(e){
+  const sv=e.target.closest&&e.target.closest('svg.ch');if(!sv||!chartData)return;
+  const C=chartData,r=sv.getBoundingClientRect();if(!r.width)return;
+  let i=Math.round(((e.clientX-r.left)*C.W/r.width-C.L)/(C.W-C.L-C.R)*(C.n-1));i=Math.max(0,Math.min(C.n-1,i));
+  const d=C.days[i],px=C.x(i),py=C.y(d.bal),wrap=sv.parentNode,tip=wrap.querySelector('.tip'),g=sv.querySelector('#cgl'),c=sv.querySelector('#cgd'),pis=S.regla.piso||0;
+  g.setAttribute('x1',px);g.setAttribute('x2',px);g.setAttribute('visibility','visible');
+  c.setAttribute('cx',px);c.setAttribute('cy',py);c.setAttribute('visibility','visible');
+  const ev=C.ev[d.date]||[];
+  tip.innerHTML='<span class="d">'+esc(toD(d.date).toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'}))+'</span><b class="'+(d.bal<0?'neg':d.bal<pis?'warn':'')+'">'+fmt(d.bal)+'</b>'+ev.slice(0,4).map(t=>'<div class="ev">'+esc(t)+'</div>').join('')+(ev.length>4?'<div class="ev">y '+(ev.length-4)+' más</div>':'');
+  tip.hidden=false;
+  const w=tip.offsetWidth,cw=wrap.clientWidth;
+  tip.style.left=Math.max(0,Math.min(cw-w,px/C.W*r.width+(r.left-wrap.getBoundingClientRect().left)-w/2))+'px';
+}
+function chartHide(){document.querySelectorAll('.chw .tip').forEach(t=>{t.hidden=true});document.querySelectorAll('#cgl,#cgd').forEach(n=>n.setAttribute('visibility','hidden'))}
+document.addEventListener('pointermove',e=>{if(e.target.closest&&e.target.closest('svg.ch'))chartShow(e);else if(e.pointerType!=='touch')chartHide()});
+document.addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('svg.ch'))chartShow(e);else chartHide()});
 function vAnalisis(){
   const t=today();
   if(!S.plan.items.length)return '<div class="card"><b>Todavía no cargaste tu plan.</b><div class="mu" style="margin-top:6px">Acá se dibuja tu saldo día por día, lo que vence y cuánto de lo que tenés es realmente libre. Para eso necesito saber qué entra y qué sale cada mes (ingresos, gastos fijos, topes).</div><div class="acts"><button class="btn p" data-act="planOpen">Armar mi plan</button><button class="btn" data-act="settings">Importar plan desde ajustes</button></div></div>';
